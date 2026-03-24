@@ -7,7 +7,7 @@
 # Always creates a backup before making changes.
 # ============================================================
 
-CURRENT_VERSION="1.4.0"
+CURRENT_VERSION="1.4.1"
 BASE_DIR="${AGENTCEO_BASE:-$HOME}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TEMPLATE_DIR="$(cd "$SCRIPT_DIR/../../agent/templates" && pwd 2>/dev/null || echo "")"
@@ -108,6 +108,11 @@ fi
 if [[ -f "$LAUNCHER" ]] && grep -qE 'CLAUDE_BIN=/home/' "$LAUNCHER" 2>/dev/null; then
     upgrade_items+=("launcher_hardcoded_path")
     upgrade_descriptions+=("start_${AGENT_NAME}.sh: replace hardcoded claude path with runtime detection")
+fi
+
+if [[ -f "$LAUNCHER" ]] && grep -q '| tee' "$LAUNCHER" 2>/dev/null; then
+    upgrade_items+=("launcher_tee_pipe")
+    upgrade_descriptions+=("start_${AGENT_NAME}.sh: remove tee pipe — breaks interactive Claude Code sessions")
 fi
 
 if [[ -f "$ENV_FILE" ]]; then
@@ -317,6 +322,43 @@ if [[ " ${upgrade_items[*]} " == *" launcher_hardcoded_path "* ]]; then
     (( CHANGED++ ))
 fi
 
+# ── Launcher: remove tee pipe (breaks interactive TTY) ────────────────────────
+if [[ " ${upgrade_items[*]} " == *" launcher_tee_pipe "* ]]; then
+    # Detect agent display name and emoji from existing launcher
+    local_emoji=$(grep -o '^echo ".*Launching' "$LAUNCHER" 2>/dev/null | grep -o '^echo "[^ ]*' | sed 's/echo "//' | head -1)
+    [[ -z "$local_emoji" ]] && local_emoji="🤖"
+    local_display=$(grep -o 'Launching .*\.\.\.' "$LAUNCHER" 2>/dev/null | sed 's/Launching //' | sed 's/\.\.\.//' | head -1)
+    [[ -z "$local_display" ]] && local_display="$AGENT_NAME"
+
+    cat > "$LAUNCHER" << LAUNCHEOF
+#!/bin/bash
+# $local_display Launcher — AgentCEO v$CURRENT_VERSION
+unset ANTHROPIC_API_KEY
+
+AGENT_DIR="$AGENT_DIR"
+RESUME_FILE="\$AGENT_DIR/memory/last_session.txt"
+CLAUDE_BIN=\$(which claude 2>/dev/null || echo "\$HOME/.npm-global/bin/claude")
+
+echo "$local_emoji Launching $local_display..."
+
+cd "\$AGENT_DIR"
+
+if [ -f "\$RESUME_FILE" ] && [ -s "\$RESUME_FILE" ]; then
+    SESSION_ID=\$(cat "\$RESUME_FILE")
+    echo "📂 Resuming session: \$SESSION_ID"
+    exec \$CLAUDE_BIN \\
+        --resume "\$SESSION_ID" \\
+        --dangerously-skip-permissions
+else
+    echo "🆕 Starting fresh session..."
+    exec \$CLAUDE_BIN --dangerously-skip-permissions
+fi
+LAUNCHEOF
+    chmod +x "$LAUNCHER"
+    changed "start_${AGENT_NAME}.sh — removed tee pipe, now launches interactively"
+    (( CHANGED++ ))
+fi
+
 # ── .env permissions ──────────────────────────────────────────────────────────
 if [[ " ${upgrade_items[*]} " == *" env_permissions "* ]]; then
     chmod 600 "$ENV_FILE"
@@ -378,6 +420,15 @@ if [[ -f "$SETTINGS_JSON" ]]; then
         bad "settings.json — still has autoMemory"; (( errors++ ))
     else
         ok "settings.json — no autoMemory"
+    fi
+fi
+
+# Launcher tee check
+if [[ -f "$LAUNCHER" ]]; then
+    if grep -q '| tee' "$LAUNCHER" 2>/dev/null; then
+        bad "Launcher still has tee pipe"; (( errors++ ))
+    else
+        ok "Launcher — interactive mode clean"
     fi
 fi
 

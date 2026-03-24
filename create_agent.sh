@@ -10,7 +10,7 @@
 # ============================================================
 # Configuration — set your GitHub username here
 # ============================================================
-VERSION="1.4.0"
+VERSION="1.4.1"
 AGENTCEO_GITHUB_USER="${AGENTCEO_GITHUB_USER:-CheskoSebulba}"
 AGENTCEO_REPO_URL="https://github.com/$AGENTCEO_GITHUB_USER/agentceo"
 
@@ -415,7 +415,7 @@ else
     echo "⏭️  SSH setup skipped — no staging server configured"
 fi
 
-# Step 12 — Startup script with session capture
+# Step 12 — Startup script
 cat > "$AGENT_DIR/start_${AGENT_NAME}.sh" << STARTEOF
 #!/bin/bash
 # $AGENT_DISPLAY Launcher — AgentCEO v$VERSION
@@ -423,37 +423,21 @@ unset ANTHROPIC_API_KEY
 
 AGENT_DIR="$AGENT_DIR"
 RESUME_FILE="\$AGENT_DIR/memory/last_session.txt"
-SESSION_LOG="/tmp/${AGENT_NAME}_session.log"
 CLAUDE_BIN=\$(which claude 2>/dev/null || echo "\$HOME/.npm-global/bin/claude")
 
 echo "$AGENT_EMOJI Launching $AGENT_DISPLAY..."
 
 cd "\$AGENT_DIR"
 
-# Launch claude and capture all output including session ID
-if [ -f "\$RESUME_FILE" ]; then
+if [ -f "\$RESUME_FILE" ] && [ -s "\$RESUME_FILE" ]; then
     SESSION_ID=\$(cat "\$RESUME_FILE")
     echo "📂 Resuming session: \$SESSION_ID"
-    \$CLAUDE_BIN \
+    exec \$CLAUDE_BIN \
         --resume "\$SESSION_ID" \
-        --dangerously-skip-permissions \
-        "$AGENT_DISPLAY, execute your startup routine now." \
-        2>&1 | tee "\$SESSION_LOG"
+        --dangerously-skip-permissions
 else
     echo "🆕 Starting fresh session..."
-    \$CLAUDE_BIN \
-        --dangerously-skip-permissions \
-        2>&1 | tee "\$SESSION_LOG"
-fi
-
-# Auto-capture session ID on exit
-NEW_SESSION=\$(grep -o 'resume [a-f0-9-]\{36\}' "\$SESSION_LOG" | tail -1 | awk '{print \$2}')
-if [ -n "\$NEW_SESSION" ]; then
-    echo "\$NEW_SESSION" > "\$RESUME_FILE"
-    echo "💾 Session saved: \$NEW_SESSION"
-else
-    echo "⚠️  No session ID captured — resume manually if needed"
-    echo "    Look for: Resume this session with: claude --resume <id>"
+    exec \$CLAUDE_BIN --dangerously-skip-permissions
 fi
 STARTEOF
 chmod +x "$AGENT_DIR/start_${AGENT_NAME}.sh"

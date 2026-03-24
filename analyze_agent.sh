@@ -7,7 +7,7 @@
 # audits files, and reports what an upgrade would change.
 # ============================================================
 
-CURRENT_VERSION="1.4.0"
+CURRENT_VERSION="1.4.1"
 BASE_DIR="${AGENTCEO_BASE:-$HOME}"
 
 # ── Colors ────────────────────────────────────────────────────────────────────
@@ -213,6 +213,17 @@ analyze_agent() {
             needs_upgrade=1
         else
             ok "Launcher uses runtime claude detection (v1.2.0+)"
+        fi
+    fi
+
+    # v1.4.1: launcher must not pipe stdout (breaks interactive TTY)
+    if [[ -f "$launcher" ]]; then
+        if grep -q '| tee' "$launcher" 2>/dev/null; then
+            bad "Launcher pipes stdout with tee — breaks interactive mode (pre-v1.4.1)"
+            upgrade_items+=("start_${agent_name}.sh: remove tee pipe — breaks interactive Claude Code sessions")
+            needs_upgrade=1
+        else
+            ok "Launcher runs interactively (v1.4.1+)"
         fi
     fi
 
