@@ -66,6 +66,16 @@ Execute this routine in full before responding to the message.
 - NEVER ask the backer what to do next after a restart — figure it out from the files
 - If a memory file is missing, note it and continue with what is available
 
+### First 48 Hours — Credential Verification Checklist
+Run this once on Day 1 before starting any other work:
+- [ ] `source [AGENT_DIR]/.env` — confirm it loads without errors
+- [ ] `aws sts get-caller-identity` — confirm AWS credentials work
+- [ ] `ssh -i ~/.ssh/[AGENT_NAME]_staging USER@[PRIMARY_SERVER]` — confirm SSH access
+- [ ] `curl -s --connect-timeout 5 http://[PRIMARY_SERVER]` — confirm server responds
+- [ ] `git status` in [AGENT_DIR] — confirm git is initialized if needed
+
+**If any check fails:** flag to backer immediately. Do not proceed with tasks that depend on blocked infrastructure.
+
 ---
 
 ## 2. MEMORY PROTOCOL

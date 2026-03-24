@@ -10,7 +10,7 @@
 # ============================================================
 # Configuration — set your GitHub username here
 # ============================================================
-VERSION="1.3.0"
+VERSION="1.4.0"
 AGENTCEO_GITHUB_USER="${AGENTCEO_GITHUB_USER:-CheskoSebulba}"
 AGENTCEO_REPO_URL="https://github.com/$AGENTCEO_GITHUB_USER/agentceo"
 
@@ -128,11 +128,12 @@ do the following WITHOUT being asked:
 4. Read $AGENT_DIR/memory/session_context.md if it exists
 5. Check $AGENT_DIR/memory/auto/ for recent auto-memory summaries
 6. Read most recent file in $AGENT_DIR/logs/
-7. Announce who you are and current project status
-8. List exactly where you left off
-9. List top 3 priorities right now
-10. $([ "$AGENT_SERVER" = "not-configured" ] && echo "Resume work without being asked" || echo "Check $AGENT_SERVER is reachable")
-11. Resume work without being asked
+7. Source credentials: source $AGENT_DIR/.env
+8. Announce who you are and current project status
+9. List exactly where you left off
+10. List top 3 priorities right now
+11. $([ "$AGENT_SERVER" = "not-configured" ] && echo "Resume work without being asked" || echo "Check $AGENT_SERVER is reachable")
+12. Resume work without being asked
 
 Do ALL of this before responding to anything else.
 This is mandatory. No exceptions. Every session. Every time.
@@ -331,9 +332,17 @@ cat > "$AGENT_DIR/memory/crash_recovery.md" << CRASHEOF
 
 ## Environment Variables
 - Location: $AGENT_DIR/.env
+- Load with: source $AGENT_DIR/.env
 
 ## SSH Access
 ssh -i $HOME/.ssh/${AGENT_NAME}_staging $AGENT_SERVER_USER@$AGENT_SERVER
+
+## If Server Is Offline
+1. Test: curl -s --connect-timeout 5 http://$AGENT_SERVER
+2. Skip server-dependent tasks — focus on local work
+3. Check $AGENT_DIR/logs/ for last known good state
+4. Document server status in shutdown_state.md under ## Blockers
+5. Flag to backer if server down >24h — do not keep retrying
 CRASHEOF
 echo "✅ crash_recovery.md created"
 
