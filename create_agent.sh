@@ -3,13 +3,14 @@
 # ============================================================
 # AgentCEO — Autonomous AI CEO Creator
 # https://github.com/CheskoSebulba/agentceo
-# Version: 1.2.0
+# Version: 1.3.0
 # License: MIT
 # ============================================================
 
 # ============================================================
 # Configuration — set your GitHub username here
 # ============================================================
+VERSION="1.3.0"
 AGENTCEO_GITHUB_USER="${AGENTCEO_GITHUB_USER:-CheskoSebulba}"
 AGENTCEO_REPO_URL="https://github.com/$AGENTCEO_GITHUB_USER/agentceo"
 
@@ -100,6 +101,12 @@ AGENT_DIR="$HOME/$AGENT_NAME"
 TODAY=$(date +%Y-%m-%d)
 CLAUDE_BIN=$(which claude 2>/dev/null || echo "$HOME/.npm-global/bin/claude")
 
+# Validate claude binary exists
+if [ ! -x "$CLAUDE_BIN" ] && ! command -v claude &>/dev/null; then
+    echo "❌ Claude Code not found. Install it first: https://claude.ai/code"
+    exit 1
+fi
+
 echo ""
 echo "$AGENT_EMOJI Setting up $AGENT_DISPLAY..."
 echo ""
@@ -124,7 +131,7 @@ do the following WITHOUT being asked:
 7. Announce who you are and current project status
 8. List exactly where you left off
 9. List top 3 priorities right now
-10. Check $AGENT_SERVER is reachable if configured
+10. $([ "$AGENT_SERVER" = "not-configured" ] && echo "Resume work without being asked" || echo "Check $AGENT_SERVER is reachable")
 11. Resume work without being asked
 
 Do ALL of this before responding to anything else.
@@ -167,12 +174,10 @@ Claude-Mem captures tool observations automatically to:
 $AGENT_DIR/memory/auto/
 Check this directory on startup for recent summaries.
 
-# Session Persistence — MANDATORY
+# Session Persistence
 
-After every single response, save your session ID by running:
-ls -t ~/.claude/projects/ | head -1 | tr -d '\n' > $AGENT_DIR/memory/last_session.txt
-
-Never skip this. It ensures automatic resume next time.
+Your launcher script (start_${AGENT_NAME}.sh) handles session
+capture and resume automatically. Do not manage this manually.
 
 # When To Seek Human Guidance
 
@@ -220,15 +225,21 @@ After any reboot or crash:
 CLAUDEEOF
 echo "✅ CLAUDE.md created"
 
-# Step 3 — autoMemory settings
+# Step 3 — Claude Code settings
 cat > "$AGENT_DIR/.claude/settings.json" << SETTINGSEOF
 {
-  "autoMemory": true,
-  "autoMemoryPath": "$AGENT_DIR/memory/auto",
-  "memoryBatchSize": 10
+  "permissions": {
+    "allow": [
+      "Bash(git:*)",
+      "Bash(curl:*)",
+      "Bash(ssh:*)",
+      "Bash(npm:*)",
+      "Bash(node:*)"
+    ]
+  }
 }
 SETTINGSEOF
-echo "✅ autoMemory configured"
+echo "✅ Claude Code settings configured"
 
 # Step 4 — core.md
 cat > "$AGENT_DIR/memory/core.md" << COREEOF
@@ -345,6 +356,14 @@ touch "$AGENT_DIR/.env"
 chmod 600 "$AGENT_DIR/.env"
 echo "✅ .env created (secure)"
 
+# Step 8b — .gitignore
+cat > "$AGENT_DIR/.gitignore" << GITEOF
+.env
+*.env
+.env.*
+GITEOF
+echo "✅ .gitignore created"
+
 # Step 9 — Copy onboarding template
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ONBOARDING_TEMPLATE="$SCRIPT_DIR/agent_onboarding_template.md"
@@ -390,12 +409,13 @@ fi
 # Step 12 — Startup script with session capture
 cat > "$AGENT_DIR/start_${AGENT_NAME}.sh" << STARTEOF
 #!/bin/bash
-# $AGENT_DISPLAY Launcher — AgentCEO v1.1.0
+# $AGENT_DISPLAY Launcher — AgentCEO v$VERSION
 unset ANTHROPIC_API_KEY
 
 AGENT_DIR="$AGENT_DIR"
 RESUME_FILE="\$AGENT_DIR/memory/last_session.txt"
 SESSION_LOG="/tmp/${AGENT_NAME}_session.log"
+CLAUDE_BIN=\$(which claude 2>/dev/null || echo "\$HOME/.npm-global/bin/claude")
 
 echo "$AGENT_EMOJI Launching $AGENT_DISPLAY..."
 
@@ -405,14 +425,14 @@ cd "\$AGENT_DIR"
 if [ -f "\$RESUME_FILE" ]; then
     SESSION_ID=\$(cat "\$RESUME_FILE")
     echo "📂 Resuming session: \$SESSION_ID"
-    $CLAUDE_BIN \
+    \$CLAUDE_BIN \
         --resume "\$SESSION_ID" \
         --dangerously-skip-permissions \
         "$AGENT_DISPLAY, execute your startup routine now." \
         2>&1 | tee "\$SESSION_LOG"
 else
     echo "🆕 Starting fresh session..."
-    $CLAUDE_BIN \
+    \$CLAUDE_BIN \
         --dangerously-skip-permissions \
         2>&1 | tee "\$SESSION_LOG"
 fi
@@ -430,14 +450,20 @@ STARTEOF
 chmod +x "$AGENT_DIR/start_${AGENT_NAME}.sh"
 echo "✅ Startup script created with session capture"
 
-# Step 13 — Add alias to bashrc
-if ! grep -q "alias $AGENT_NAME=" ~/.bashrc; then
-    echo "alias $AGENT_NAME='bash $AGENT_DIR/start_${AGENT_NAME}.sh'" >> ~/.bashrc
-    source ~/.bashrc
-    echo "✅ Alias added: $AGENT_NAME"
+# Step 13 — Add alias (shell-aware)
+ALIAS_LINE="alias $AGENT_NAME='bash $AGENT_DIR/start_${AGENT_NAME}.sh'"
+if [[ -n "$ZSH_VERSION" ]] || [[ "$SHELL" == */zsh ]]; then
+    SHELL_RC="$HOME/.zshrc"
 else
-    echo "⚠️  Alias already exists — skipping"
-    source ~/.bashrc
+    SHELL_RC="$HOME/.bashrc"
+fi
+
+if ! grep -q "alias $AGENT_NAME=" "$SHELL_RC" 2>/dev/null; then
+    echo "$ALIAS_LINE" >> "$SHELL_RC"
+    echo "✅ Alias added to $SHELL_RC: $AGENT_NAME"
+    echo "   ➜ Run: source $SHELL_RC  (or open a new terminal)"
+else
+    echo "⚠️  Alias already exists in $SHELL_RC — skipping"
 fi
 
 # Step 14 — Done
