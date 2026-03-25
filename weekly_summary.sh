@@ -80,7 +80,11 @@ for log in "${log_files[@]}"; do
     fi
 done
 
-task_count=$(grep -c '^- ' "$LOGS_DIR"/*.md 2>/dev/null | awk -F: 'NR<=7{sum+=$2}END{print sum}')
+if compgen -G "$LOGS_DIR/*.md" &>/dev/null; then
+    task_count=$(grep -c '^- ' "$LOGS_DIR"/*.md 2>/dev/null | awk -F: 'NR<=7{sum+=$2}END{print sum+0}')
+else
+    task_count=0
+fi
 
 # ── Build report ──────────────────────────────────────────────────────────────
 build_report() {

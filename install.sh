@@ -118,7 +118,11 @@ echo "╔═══════════════════════�
 echo "║       ✅ AgentCEO is installed!          ║"
 echo "╚══════════════════════════════════════════╝"
 echo ""
-echo "  Start a new terminal (or run: source $SHELL_RC)"
+if [[ -n "$SHELL_RC" ]]; then
+    echo "  Start a new terminal (or run: source $SHELL_RC)"
+else
+    echo "  Start a new terminal"
+fi
 echo "  Then type:  newagent"
 echo ""
 echo "  Docs: https://github.com/CheskoSebulba/agentceo"

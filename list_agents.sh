@@ -57,7 +57,7 @@ get_section_first_line() {
 server_status() {
     local host="$1"
     [[ -z "$host" || "$host" == "not-configured" || "$host" == "not yet configured" ]] && echo "—" && return
-    if ping -c1 -W2 "$host" &>/dev/null 2>&1 || curl -s --connect-timeout 2 "http://$host" &>/dev/null 2>&1; then
+    if curl -s --connect-timeout 2 "http://$host" &>/dev/null 2>&1 || ping -c1 -W2 "$host" &>/dev/null 2>&1 || ping -c1 -t2 "$host" &>/dev/null 2>&1; then
         echo -e "${GREEN}●${NC} online"
     else
         echo -e "${RED}●${NC} offline"

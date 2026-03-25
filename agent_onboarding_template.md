@@ -70,7 +70,7 @@ Execute this routine in full before responding to the message.
 Run this once on Day 1 before starting any other work:
 - [ ] `source [AGENT_DIR]/.env` — confirm it loads without errors
 - [ ] `aws sts get-caller-identity` — confirm AWS credentials work
-- [ ] `ssh -i ~/.ssh/[AGENT_NAME]_staging USER@[PRIMARY_SERVER]` — confirm SSH access
+- [ ] `ssh -i ~/.ssh/[AGENT_NAME]_staging [SSH_USER]@[PRIMARY_SERVER]` — confirm SSH access
 - [ ] `curl -s --connect-timeout 5 http://[PRIMARY_SERVER]` — confirm server responds
 - [ ] `git status` in [AGENT_DIR] — confirm git is initialized if needed
 

@@ -554,7 +554,7 @@ check() {
 check "CLAUDE.md exists"           "[ -f '$AGENT_DIR/CLAUDE.md' ]"
 check "core.md exists"             "[ -f '$AGENT_DIR/memory/core.md' ]"
 check "shutdown_state.md exists"   "[ -f '$AGENT_DIR/memory/shutdown_state.md' ]"
-check ".env permissions are 600"   "[ \"\$(ls -la '$AGENT_DIR/.env' | cut -c2-10)\" = 'rw-------' ]"
+check ".env permissions are 600"   "[ \"\$(stat -c '%a' '$AGENT_DIR/.env' 2>/dev/null || stat -f '%OLp' '$AGENT_DIR/.env' 2>/dev/null)\" = '600' ]"
 check "Launcher is executable"     "[ -x '$AGENT_DIR/start_${AGENT_NAME}.sh' ]"
 check ".gitignore covers memory/"  "grep -q 'memory/' '$AGENT_DIR/.gitignore'"
 check "Onboarding template ready"  "[ -f '$AGENT_DIR/memory/agent_onboarding_template.md' ]"

@@ -22,6 +22,12 @@ bad()    { echo -e "  ${RED}✘${NC}  $1"; }
 info()   { echo -e "  ${DIM}·${NC}  $1"; }
 changed(){ echo -e "  ${CYAN}→${NC}  $1"; }
 
+# Portable file permission check (Linux + macOS)
+stat_perms() { stat -c "%a" "$1" 2>/dev/null || stat -f "%OLp" "$1" 2>/dev/null; }
+
+# Portable sed -i (macOS requires a backup suffix; use empty string for in-place)
+sedi() { sed -i'' "$@" 2>/dev/null || sed -i "$@"; }
+
 # ── Resolve agent directory ───────────────────────────────────────────────────
 resolve_dir() {
     local arg="$1"
@@ -116,7 +122,7 @@ if [[ -f "$LAUNCHER" ]] && grep -q '| tee' "$LAUNCHER" 2>/dev/null; then
 fi
 
 if [[ -f "$ENV_FILE" ]]; then
-    env_perms=$(stat -c "%a" "$ENV_FILE" 2>/dev/null)
+    env_perms=$(stat_perms "$ENV_FILE")
     if [[ "$env_perms" != "600" ]]; then
         upgrade_items+=("env_permissions")
         upgrade_descriptions+=(".env: fix permissions from $env_perms to 600")
@@ -317,7 +323,7 @@ fi
 
 # ── Launcher: fix hardcoded claude path ───────────────────────────────────────
 if [[ " ${upgrade_items[*]} " == *" launcher_hardcoded_path "* ]]; then
-    sed -i 's|CLAUDE_BIN=.*|CLAUDE_BIN=$(which claude 2>/dev/null || echo "$HOME/.npm-global/bin/claude")|g' "$LAUNCHER"
+    sedi 's|CLAUDE_BIN=.*|CLAUDE_BIN=$(which claude 2>/dev/null || echo "$HOME/.npm-global/bin/claude")|g' "$LAUNCHER"
     changed "start_${AGENT_NAME}.sh — replaced hardcoded claude path with runtime detection"
     (( CHANGED++ ))
 fi
@@ -443,7 +449,7 @@ fi
 
 # .env permissions
 if [[ -f "$ENV_FILE" ]]; then
-    perms=$(stat -c "%a" "$ENV_FILE" 2>/dev/null)
+    perms=$(stat_perms "$ENV_FILE")
     if [[ "$perms" == "600" ]]; then
         ok ".env — permissions 600"
     else

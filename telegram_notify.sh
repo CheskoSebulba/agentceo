@@ -107,11 +107,12 @@ send_message() {
         --data-urlencode "text=$text" \
         2>/dev/null)
 
-    if echo "$response" | python3 -c "import sys,json; d=json.load(sys.stdin); exit(0 if d.get('ok') else 1)" 2>/dev/null; then
+    if echo "$response" | grep -q '"ok":true'; then
         echo "✅ Telegram message sent"
     else
         echo "❌ Telegram send failed"
-        echo "$response" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('description','unknown error'))" 2>/dev/null
+        # Extract description without python3 dependency
+        echo "$response" | grep -o '"description":"[^"]*"' | sed 's/"description":"//;s/"//' || echo "$response"
         exit 1
     fi
 }
