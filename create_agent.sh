@@ -527,7 +527,47 @@ else
     echo "⚠️  Alias already exists in $SHELL_RC — skipping"
 fi
 
-# Step 14 — Done
+# Step 13b — Copy telegram_notify.sh to agent scripts/
+TELEGRAM_SCRIPT="$SCRIPT_DIR/../telegram_notify.sh"
+if [ -f "$TELEGRAM_SCRIPT" ]; then
+    cp "$TELEGRAM_SCRIPT" "$AGENT_DIR/scripts/telegram_notify.sh"
+    chmod +x "$AGENT_DIR/scripts/telegram_notify.sh"
+    echo "✅ telegram_notify.sh installed to scripts/"
+fi
+
+# Step 14 — Post-install validation
+echo ""
+echo "🔍 Verifying setup..."
+VERIFY_PASS=0
+VERIFY_FAIL=0
+
+check() {
+    if eval "$2" &>/dev/null; then
+        echo "  ✅ $1"
+        (( VERIFY_PASS++ ))
+    else
+        echo "  ❌ $1"
+        (( VERIFY_FAIL++ ))
+    fi
+}
+
+check "CLAUDE.md exists"           "[ -f '$AGENT_DIR/CLAUDE.md' ]"
+check "core.md exists"             "[ -f '$AGENT_DIR/memory/core.md' ]"
+check "shutdown_state.md exists"   "[ -f '$AGENT_DIR/memory/shutdown_state.md' ]"
+check ".env permissions are 600"   "[ \"\$(ls -la '$AGENT_DIR/.env' | cut -c2-10)\" = 'rw-------' ]"
+check "Launcher is executable"     "[ -x '$AGENT_DIR/start_${AGENT_NAME}.sh' ]"
+check ".gitignore covers memory/"  "grep -q 'memory/' '$AGENT_DIR/.gitignore'"
+check "Onboarding template ready"  "[ -f '$AGENT_DIR/memory/agent_onboarding_template.md' ]"
+check "Claude Code found"          "command -v claude || [ -x '$CLAUDE_BIN' ]"
+
+if [[ $VERIFY_FAIL -gt 0 ]]; then
+    echo ""
+    echo "  ⚠️  $VERIFY_FAIL check(s) failed — review above before launching"
+else
+    echo "  All checks passed ✅"
+fi
+
+# Step 15 — Done
 echo ""
 echo "╔══════════════════════════════════════════╗"
 echo "║     ✅ $AGENT_DISPLAY is ready!          "
