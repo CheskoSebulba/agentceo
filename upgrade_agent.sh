@@ -323,7 +323,7 @@ fi
 
 # ── Launcher: fix hardcoded claude path ───────────────────────────────────────
 if [[ " ${upgrade_items[*]} " == *" launcher_hardcoded_path "* ]]; then
-    sedi 's|CLAUDE_BIN=.*|CLAUDE_BIN=$(which claude 2>/dev/null || echo "$HOME/.npm-global/bin/claude")|g' "$LAUNCHER"
+    sedi 's#CLAUDE_BIN=.*#CLAUDE_BIN=$(which claude 2>/dev/null || echo "$HOME/.npm-global/bin/claude")#g' "$LAUNCHER"
     changed "start_${AGENT_NAME}.sh — replaced hardcoded claude path with runtime detection"
     (( CHANGED++ ))
 fi
