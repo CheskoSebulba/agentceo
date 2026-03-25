@@ -1,8 +1,10 @@
 # AgentCEO
 
-> A bash framework for spinning up autonomous AI CEO agents on Claude Code.
+> An AI that runs your business while you sleep.
 
-Each agent gets its own identity, persistent memory, session resumption, and startup/shutdown protocols — so it can run a real business autonomously and report back to its human backer (you).
+Give it a name, a mission, and a server. It ships products, manages deployments, writes code, and sends you a morning report. You step in when it needs money, credentials, or a strategic call — everything else it handles on its own.
+
+Built on [Claude Code](https://claude.ai/code). Pure bash. No dependencies.
 
 ![AgentCEO demo](demo.gif)
 
@@ -13,9 +15,15 @@ Each agent gets its own identity, persistent memory, session resumption, and sta
 ### Prerequisites
 
 - Linux or macOS
-- [Claude Code](https://claude.ai/code) installed and authenticated
+- Claude Code ≥ 1.0 — [install guide](https://claude.ai/code)
 
-### Install
+**New to Claude Code?** Three commands:
+```bash
+npm install -g @anthropic-ai/claude-code
+claude   # follow the auth prompts
+```
+
+### Step 1 — Clone and create your agent
 
 ```bash
 git clone https://github.com/CheskoSebulba/agentceo.git
@@ -23,11 +31,23 @@ cd agentceo
 bash create_agent.sh
 ```
 
-Follow the prompts. Then launch your agent:
+Follow the prompts. Takes about 2 minutes.
+
+### Step 2 — Source your shell
+
+```bash
+source ~/.bashrc   # or ~/.zshrc if you use zsh
+```
+
+### Step 3 — Launch
 
 ```bash
 aria
 ```
+
+The agent reads its memory files, announces its status, and resumes work — no prompting needed.
+
+**First launch only:** the script prints a short onboarding prompt at the end of setup. Paste it into Claude Code on first launch to bootstrap the agent's identity. After that, the launcher handles everything automatically.
 
 ---
 
@@ -45,7 +65,7 @@ Staging server SSH username: deploy
 Launch emoji (Enter for 🤖): 🦾
 ```
 
-It then creates:
+It creates:
 
 ```
 /home/youruser/aria/
@@ -56,6 +76,7 @@ It then creates:
 │   ├── core.md                      # Business state
 │   ├── shutdown_state.md            # Live task tracker
 │   ├── crash_recovery.md            # Recovery playbook
+│   ├── pending_backer_actions.md    # Items waiting for your input
 │   └── agent_onboarding_template.md # Full operating protocols
 ├── logs/
 │   └── YYYY-MM-DD.md                # Daily activity log
@@ -70,11 +91,13 @@ And adds a shell alias so `aria` launches the agent instantly.
 
 ## The Staging Server
 
+### Skip it if you just want to try the framework
+
+Press Enter at the hostname prompt. Your agent works locally — writing code, managing files, planning. You can add a server any time later.
+
 ### What it is
 
-A staging server is a Linux machine your agent can SSH into to actually run things. It's where the agent deploys websites, runs background services, hosts APIs, and operates anything that needs to be live on the internet.
-
-Without a staging server, your agent works locally only — writing code, planning, and managing files on your machine. With one, it can ship real products.
+A staging server is a Linux machine your agent can SSH into. It's where the agent deploys websites, runs services, hosts APIs, and operates anything that needs to be live on the internet.
 
 ### What your agent can do with it
 
@@ -82,7 +105,7 @@ Without a staging server, your agent works locally only — writing code, planni
 - Start and stop web servers (nginx, Node, Python)
 - Run cron jobs autonomously
 - Host live products and APIs
-- Check that services are still running on every startup
+- Check services are running on every startup
 - Recover from crashes and restart services
 
 ### What counts as a staging server
@@ -96,18 +119,12 @@ Anything running Linux that you can SSH into:
 | Old laptop running Ubuntu | ~$0 | Same as above |
 | Any VPS you already have | ~$0 | Reuse existing infra |
 
-### How to set one up (DigitalOcean example)
+### DigitalOcean setup (5 minutes)
 
-1. Create a Ubuntu 22.04 droplet (the $6/mo size is plenty)
-2. Note the IP address — use it as the hostname, or point a domain at it
-3. Create a user for your agent: `adduser aria && usermod -aG sudo aria`
-4. Run `bash create_agent.sh` and enter the hostname and username when prompted
-
-`create_agent.sh` generates an SSH key and copies it to the server automatically. No manual key setup required.
-
-### Skipping the staging server
-
-Press Enter at the hostname prompt to skip. Your agent will still work — it just operates locally. You can always add a server later by editing `crash_recovery.md` and `CLAUDE.md` in the agent's directory.
+1. Create a Ubuntu 22.04 droplet ($6/mo is enough)
+2. Note the IP — use it as the hostname, or point a domain at it
+3. Create a user: `adduser aria && usermod -aG sudo aria`
+4. Run `bash create_agent.sh` — it generates and copies the SSH key automatically
 
 ---
 
@@ -127,11 +144,19 @@ No "what should I work on?" — it figures that out from the files.
 
 ### Session Persistence
 
-The launcher saves the Claude Code session ID on exit and resumes it on next launch via `--resume`. If no prior session exists, `--continue` picks up the most recent conversation. The agent never loses context.
+The launcher saves the Claude Code session ID and resumes it on next launch via `--resume`. If no prior session exists, `--continue` picks up the most recent conversation.
 
-On every launch, the launcher automatically sends `"[Agent], execute your startup routine now."` as the first message — so the agent reads its memory and announces status without any manual prompting.
+On every launch, the launcher automatically sends `"[Agent], execute your startup routine now."` as the first message — so the agent reads its memory and announces status without any prompting.
 
-> **Note:** When using `--resume`, the prior session context loads before the startup message fires. This is expected. Wait for the agent to complete its startup routine before typing anything.
+> **Note:** When using `--resume`, the prior session context loads before the startup message fires. This is expected — wait for the startup routine to complete before typing anything.
+
+### Permissions model
+
+Every agent launcher passes `--dangerously-skip-permissions` to Claude Code. This flag disables per-tool confirmation prompts so the agent can work autonomously without stopping to ask for approval on every file read or bash command. Without it, the agent would pause on every action and require human confirmation — defeating the purpose.
+
+The security boundary is the directory scope enforced in `CLAUDE.md`: each agent is restricted to its own directory and staging server, and will not touch other agents' files or credentials.
+
+If you prefer manual approval on sensitive operations, remove the flag from the generated `start_<agent>.sh` and use `settings.json` to allowlist specific commands.
 
 ### Memory System
 
@@ -140,16 +165,12 @@ On every launch, the launcher automatically sends `"[Agent], execute your startu
 | `core.md` | On major changes | Revenue, products, infrastructure, key decisions |
 | `shutdown_state.md` | After every action | Exact current task — enables mid-task crash recovery |
 | `crash_recovery.md` | On infra changes | How to SSH in, restart services, redeploy |
-| `session_context.md` | Every session | What was agreed with the backer |
+| `pending_backer_actions.md` | When escalating | Items waiting for your input |
 | `logs/YYYY-MM-DD.md` | After every task | Full audit trail |
-
-### Boundaries
-
-Each agent is scoped to its own directory and staging server. It will never read, write, or touch another agent's files, credentials, or infrastructure.
 
 ### Human Escalation
 
-Your **backer** is you — the human who owns and runs the agent. The agent works autonomously but escalates to you when:
+Your **backer** is you — the human who owns and runs the agent. The agent works autonomously but escalates when:
 
 - A credential or API key is needed
 - About to spend money
@@ -157,7 +178,7 @@ Your **backer** is you — the human who owns and runs the agent. The agent work
 - A major strategic decision needs approval
 - Something has gone wrong that affects a live product
 
-Everything else they handle autonomously.
+Everything else it handles on its own.
 
 ---
 
@@ -166,18 +187,12 @@ Everything else they handle autonomously.
 | File | Purpose |
 |------|---------|
 | `create_agent.sh` | Main creator — run once per agent |
-| `start_agent_template.sh` | Reference launcher template |
-| `agent_onboarding_template.md` | Full operating protocols injected into each agent's memory |
+| `start_agent_template.sh` | Reference launcher template for custom launchers |
+| `agent_onboarding_template.md` | Full operating protocols — copied into each agent's memory |
 
 ---
 
 ## Configuration
-
-`create_agent.sh` detects the `claude` binary automatically:
-
-```bash
-CLAUDE_BIN=$(which claude 2>/dev/null || echo "$HOME/.npm-global/bin/claude")
-```
 
 Override the default GitHub username without editing the file:
 
@@ -189,30 +204,76 @@ AGENTCEO_GITHUB_USER=your-username bash create_agent.sh
 
 ## Security
 
-- All credentials live in `$AGENT_DIR/.env` — never in logs, memory, or git
-- `.env` is created with `chmod 600`
-- `.env` is added to `.gitignore` by convention
-- SSH keys are stored in `$HOME/.ssh/` — never committed
+- All credentials live in `.env` (chmod 600) — never in logs, memory, or git
+- `memory/` and `logs/` are in `.gitignore` — infra details stay local
+- SSH keys stored in `~/.ssh/` — never committed
+- SSH password not echoed to terminal; not passed via process arguments
 - The onboarding protocol explicitly prohibits logging any credential
+- See [SECURITY.md](SECURITY.md) for the full threat model and known limitations
+
+---
+
+## Troubleshooting
+
+**`command not found` after setup**
+The alias was added to your shell config but the current session doesn't see it yet.
+```bash
+source ~/.bashrc   # or source ~/.zshrc
+```
+
+**`❌ Claude Code not found`**
+Claude Code isn't installed or isn't in your PATH.
+```bash
+npm install -g @anthropic-ai/claude-code
+# if using nvm: nvm use --lts first
+```
+
+**SSH key copy failed**
+The script printed a manual copy command — run it:
+```bash
+ssh-copy-id -i ~/.ssh/aria_staging.pub deploy@aria.local
+```
+
+**`sshpass` not available**
+```bash
+# Ubuntu/Debian
+sudo apt-get install sshpass
+# macOS
+brew install sshpass
+# Arch
+sudo pacman -S sshpass
+```
+
+**Agent directory already exists**
+The script prompts before overwriting. Business data (`core.md`, logs, `.env`) is preserved. Only framework files are replaced.
+
+**`--resume` loads old context before startup message**
+This is expected. The prior session loads first, then the startup message fires. Wait for the startup routine to finish before typing.
+
+---
+
+## Known Issues
+
+- **macOS `stat` command** — `upgrade_agent.sh` and `run_tests.sh` use Linux `stat` syntax on some code paths. Fixed in v1.6.0.
+- **Agent name collision** — creating two agents with the same name overwrites the first. The script now prompts before overwriting.
+- **Session ID not written by launcher** — the session ID is written by the agent itself during its session, not by the launcher on exit. If a session crashes before the agent writes it, `--resume` silently falls back to `--continue`.
 
 ---
 
 ## Real Agents Running This Framework
-
-This framework was built by running it. The agents below operate on this codebase in production:
 
 | Agent | Company | Role |
 |-------|---------|------|
 | aria | Acme Store | E-commerce, product, marketing |
 | sam | AgentCEO | This repo — framework maintenance |
 
+If you've built an agent with this framework, open a PR to add it.
+
 ---
 
 ## Contributing
 
 Issues and pull requests welcome.
-
-If you've built an agent with this framework and want it listed above, open a PR.
 
 ---
 
