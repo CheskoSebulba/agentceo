@@ -3,20 +3,25 @@
 # ============================================================
 # AgentCEO — Autonomous AI CEO Creator
 # https://github.com/CheskoSebulba/agentceo
-# Version: 1.5.0
+# Version: 1.6.0
 # License: MIT
 # ============================================================
 
 # ============================================================
 # Configuration — set your GitHub username here
 # ============================================================
-VERSION="1.5.0"
+VERSION="1.6.0"
 AGENTCEO_GITHUB_USER="${AGENTCEO_GITHUB_USER:-CheskoSebulba}"
 AGENTCEO_REPO_URL="https://github.com/$AGENTCEO_GITHUB_USER/agentceo"
 
 # OS detection
 OS="linux"
 [[ "$(uname)" == "Darwin" ]] && OS="macos"
+
+# Sanitize free-text input — strip shell-dangerous characters
+sanitize() {
+    echo "$1" | tr -d '`$\\<>|;&' | sed "s/'//g"
+}
 
 echo ""
 echo "╔══════════════════════════════════════════╗"
@@ -28,19 +33,20 @@ echo ""
 # Interactive prompts with validation
 # ============================================================
 
-# Agent name — required, lowercase, no spaces
+# Agent name — required, lowercase, min 2 chars, no spaces
 while true; do
     read -p "Agent name (lowercase, no spaces) e.g. walter: " AGENT_NAME
-    if [[ "$AGENT_NAME" =~ ^[a-z]+$ ]]; then
+    if [[ "$AGENT_NAME" =~ ^[a-z]{2,}$ ]]; then
         break
     fi
-    echo "❌ Agent name must be lowercase letters only. Try again."
+    echo "❌ Agent name must be 2+ lowercase letters only. Try again."
 done
 
 # Display name — required
 while true; do
-    read -p "Display name e.g. Walter: " AGENT_DISPLAY
-    if [ -n "$AGENT_DISPLAY" ]; then
+    read -p "Display name e.g. Walter: " AGENT_DISPLAY_RAW
+    if [ -n "$AGENT_DISPLAY_RAW" ]; then
+        AGENT_DISPLAY=$(sanitize "$AGENT_DISPLAY_RAW")
         break
     fi
     echo "❌ Display name is required. Try again."
@@ -48,16 +54,17 @@ done
 
 # Company — required
 while true; do
-    read -p "Company name e.g. Acme Corp: " AGENT_COMPANY
-    if [ -n "$AGENT_COMPANY" ]; then
+    read -p "Company name e.g. Acme Corp: " AGENT_COMPANY_RAW
+    if [ -n "$AGENT_COMPANY_RAW" ]; then
+        AGENT_COMPANY=$(sanitize "$AGENT_COMPANY_RAW")
         break
     fi
     echo "❌ Company name is required. Try again."
 done
 
 # Mission — optional
-read -p "Mission (Enter for TBD): " AGENT_MISSION
-AGENT_MISSION=${AGENT_MISSION:-"TBD — awaiting backer briefing"}
+read -p "Mission (Enter for TBD): " AGENT_MISSION_RAW
+AGENT_MISSION=$(sanitize "${AGENT_MISSION_RAW:-"TBD — awaiting backer briefing"}")
 
 # Staging server — optional, warn if blank
 read -p "Staging server hostname e.g. walter.local (Enter to skip): " AGENT_SERVER
@@ -75,7 +82,8 @@ else
         fi
         echo "❌ SSH username is required. Try again."
     done
-    read -p "Staging server SSH password (Enter to copy key manually later): " AGENT_SERVER_PASS
+    read -s -p "Staging server SSH password (Enter to copy key manually later): " AGENT_SERVER_PASS
+    echo ""
 fi
 
 # Emoji — optional
@@ -110,6 +118,22 @@ if [ ! -x "$CLAUDE_BIN" ] && ! command -v claude &>/dev/null; then
     echo "❌ Claude Code not found. Install it first: https://claude.ai/code"
     exit 1
 fi
+
+# Check for existing agent directory
+if [ -d "$AGENT_DIR" ]; then
+    echo "⚠️  Directory $AGENT_DIR already exists."
+    read -p "Overwrite framework files? Business data (core.md, logs, .env) will be preserved. (y/n): " OVERWRITE
+    if [ "$OVERWRITE" != "y" ]; then
+        echo "Cancelled."
+        exit 1
+    fi
+fi
+
+# Secure file creation — restrict permissions to owner only
+umask 0077
+
+# Cleanup on interruption
+trap 'echo ""; echo "⚠️  Setup interrupted — cleaning up..."; rm -rf "$AGENT_DIR" 2>/dev/null; exit 1' INT TERM
 
 echo ""
 echo "$AGENT_EMOJI Setting up $AGENT_DISPLAY..."
@@ -374,28 +398,55 @@ cat > "$AGENT_DIR/.gitignore" << GITEOF
 .env
 *.env
 .env.*
+memory/
+logs/
+*.log
 GITEOF
 echo "✅ .gitignore created"
 
-# Step 9 — Copy onboarding template
+# Step 9 — Copy and substitute onboarding template
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ONBOARDING_TEMPLATE="$SCRIPT_DIR/agent_onboarding_template.md"
 if [ -f "$ONBOARDING_TEMPLATE" ]; then
-    cp "$ONBOARDING_TEMPLATE" "$AGENT_DIR/memory/agent_onboarding_template.md"
-    echo "✅ Onboarding template copied"
+    sed \
+        -e "s|\[AGENT_NAME\]|$AGENT_DISPLAY|g" \
+        -e "s|\[AGENT_DIR\]|$AGENT_DIR|g" \
+        -e "s|\[PRIMARY_SERVER\]|$AGENT_SERVER|g" \
+        -e "s|\[PRIMARY_WEBSITE\]|TBD|g" \
+        "$ONBOARDING_TEMPLATE" > "$AGENT_DIR/memory/agent_onboarding_template.md"
+    echo "✅ Onboarding template copied and configured"
 else
     echo "⚠️  Onboarding template not found at $ONBOARDING_TEMPLATE"
 fi
 
+# Step 9b — Create scaffold memory files referenced in onboarding template
+touch "$AGENT_DIR/memory/interaction_history.md"
+cat > "$AGENT_DIR/memory/pending_backer_actions.md" << BACKEREOF
+# Pending Backer Actions
+
+## Items Requiring Your Input
+- None yet
+
+## Awaiting Approval
+- None yet
+BACKEREOF
+echo "✅ Memory scaffolds created"
+
 # Step 10 — Install sshpass if needed
 if ! which sshpass > /dev/null 2>&1; then
-    echo "📦 Installing sshpass..."
-    if [[ "$OS" == "macos" ]]; then
-        brew install sshpass 2>/dev/null || echo "⚠️  brew install sshpass failed — install manually"
+    echo "📦 sshpass is needed to copy the SSH key automatically."
+    read -p "   Install sshpass now? (y/n, or n to copy key manually later): " INSTALL_SSHPASS
+    if [ "$INSTALL_SSHPASS" = "y" ]; then
+        if [[ "$OS" == "macos" ]]; then
+            brew install sshpass 2>/dev/null || echo "⚠️  brew install sshpass failed — install manually"
+        else
+            sudo apt-get install -y sshpass 2>/dev/null || echo "⚠️  apt install sshpass failed — install manually"
+        fi
+        echo "✅ sshpass installed"
     else
-        sudo apt-get install -y sshpass 2>/dev/null || echo "⚠️  apt install sshpass failed — install manually"
+        echo "⏭️  Skipping sshpass — you'll need to copy the SSH key manually"
+        AGENT_SERVER_PASS=""
     fi
-    echo "✅ sshpass installed"
 fi
 
 # Step 11 — SSH key setup
@@ -409,12 +460,12 @@ if [ "$SKIP_SSH" = false ]; then
     echo "✅ SSH key generated"
 
     if [ -n "$AGENT_SERVER_PASS" ]; then
-        sshpass -p "$AGENT_SERVER_PASS" ssh-copy-id \
+        SSHPASS="$AGENT_SERVER_PASS" sshpass -e ssh-copy-id \
             -i "$HOME/.ssh/${AGENT_NAME}_staging.pub" \
-            -o StrictHostKeyChecking=no \
             "$AGENT_SERVER_USER@$AGENT_SERVER" 2>/dev/null \
             && echo "✅ SSH key copied to $AGENT_SERVER automatically" \
             || echo "⚠️  SSH copy failed — copy manually later"
+        unset SSHPASS
     else
         echo "⚠️  No password provided — copy SSH key manually:"
         echo "    ssh-copy-id -i $HOME/.ssh/${AGENT_NAME}_staging.pub $AGENT_SERVER_USER@$AGENT_SERVER"
@@ -497,19 +548,19 @@ You are $AGENT_DISPLAY, autonomous AI CEO of $AGENT_COMPANY.
 Your mission: $AGENT_MISSION
 Your directory: $AGENT_DIR — ONLY work here.
 
-Adopt all protocols from the onboarding template:
-- [AGENT_NAME] = $AGENT_DISPLAY
-- [AGENT_DIR] = $AGENT_DIR
-- [PRIMARY_SERVER] = $AGENT_SERVER
-- [PRIMARY_WEBSITE] = TBD
-
 Never touch other agents directories or servers.
 You MAY read other agents memory/core.md to learn.
 
 After reading everything:
-1. Update all memory files with your correct identity
+1. Confirm your identity and mission
 2. Save your session ID to $AGENT_DIR/memory/last_session.txt
 3. Tell me you are ready and what you need to get started
 PROMPTEOF
 echo "---END COPY---"
 echo ""
+echo "ℹ️  Note: The launcher ($AGENT_NAME) sends your startup message automatically."
+echo "   Only paste the above if launching Claude Code manually."
+echo ""
+
+# Clear the interrupt trap — setup completed successfully
+trap - INT TERM
