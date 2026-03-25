@@ -10,7 +10,7 @@
 # ============================================================
 # Configuration — set your GitHub username here
 # ============================================================
-VERSION="1.4.1"
+VERSION="1.4.2"
 AGENTCEO_GITHUB_USER="${AGENTCEO_GITHUB_USER:-CheskoSebulba}"
 AGENTCEO_REPO_URL="https://github.com/$AGENTCEO_GITHUB_USER/agentceo"
 
@@ -425,6 +425,11 @@ AGENT_DIR="$AGENT_DIR"
 RESUME_FILE="\$AGENT_DIR/memory/last_session.txt"
 CLAUDE_BIN=\$(which claude 2>/dev/null || echo "\$HOME/.npm-global/bin/claude")
 
+# Load agent credentials
+set -a
+source "\$AGENT_DIR/.env" 2>/dev/null
+set +a
+
 echo "$AGENT_EMOJI Launching $AGENT_DISPLAY..."
 
 cd "\$AGENT_DIR"
@@ -434,10 +439,14 @@ if [ -f "\$RESUME_FILE" ] && [ -s "\$RESUME_FILE" ]; then
     echo "📂 Resuming session: \$SESSION_ID"
     exec \$CLAUDE_BIN \
         --resume "\$SESSION_ID" \
-        --dangerously-skip-permissions
+        --dangerously-skip-permissions \
+        "$AGENT_DISPLAY, execute your startup routine now."
 else
     echo "🆕 Starting fresh session..."
-    exec \$CLAUDE_BIN --dangerously-skip-permissions
+    exec \$CLAUDE_BIN \
+        --continue \
+        --dangerously-skip-permissions \
+        "$AGENT_DISPLAY, execute your startup routine now."
 fi
 STARTEOF
 chmod +x "$AGENT_DIR/start_${AGENT_NAME}.sh"

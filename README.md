@@ -82,7 +82,11 @@ No "what should I work on?" — it figures that out from the files.
 
 ### Session Persistence
 
-The launcher script saves the Claude Code session ID on exit and resumes it on next launch via `--resume`. If no prior session exists, it starts fresh. The agent never loses context.
+The launcher script saves the Claude Code session ID on exit and resumes it on next launch via `--resume`. If no prior session exists, `--continue` picks up the most recent conversation. The agent never loses context.
+
+The launcher also automatically passes `"[Agent], execute your startup routine now."` as the first message on every launch — both resume and fresh paths — so the agent reads its memory files and announces status without any manual prompting.
+
+> **Note:** When using `--resume`, the prior session context loads before the startup message fires. This is expected. Wait for the agent to complete its startup routine before typing anything.
 
 ### Memory System
 
