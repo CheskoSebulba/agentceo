@@ -3,16 +3,20 @@
 # ============================================================
 # AgentCEO — Autonomous AI CEO Creator
 # https://github.com/CheskoSebulba/agentceo
-# Version: 1.3.0
+# Version: 1.5.0
 # License: MIT
 # ============================================================
 
 # ============================================================
 # Configuration — set your GitHub username here
 # ============================================================
-VERSION="1.4.2"
+VERSION="1.5.0"
 AGENTCEO_GITHUB_USER="${AGENTCEO_GITHUB_USER:-CheskoSebulba}"
 AGENTCEO_REPO_URL="https://github.com/$AGENTCEO_GITHUB_USER/agentceo"
+
+# OS detection
+OS="linux"
+[[ "$(uname)" == "Darwin" ]] && OS="macos"
 
 echo ""
 echo "╔══════════════════════════════════════════╗"
@@ -386,7 +390,11 @@ fi
 # Step 10 — Install sshpass if needed
 if ! which sshpass > /dev/null 2>&1; then
     echo "📦 Installing sshpass..."
-    sudo apt-get install -y sshpass 2>/dev/null
+    if [[ "$OS" == "macos" ]]; then
+        brew install sshpass 2>/dev/null || echo "⚠️  brew install sshpass failed — install manually"
+    else
+        sudo apt-get install -y sshpass 2>/dev/null || echo "⚠️  apt install sshpass failed — install manually"
+    fi
     echo "✅ sshpass installed"
 fi
 
