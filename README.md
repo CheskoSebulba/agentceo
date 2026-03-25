@@ -4,6 +4,8 @@
 
 Each agent gets its own identity, persistent memory, session resumption, SSH server access, Telegram reporting, and startup/shutdown protocols — so they can run real businesses autonomously and report back to their human backer.
 
+![AgentCEO demo](demo.gif)
+
 ---
 
 ## Quick Start
