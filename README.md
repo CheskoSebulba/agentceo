@@ -2,7 +2,7 @@
 
 > A bash framework for spinning up autonomous AI CEO agents on Claude Code.
 
-Each agent gets its own identity, persistent memory, session resumption, and startup/shutdown protocols — so it can run a real business autonomously and report back to its human backer.
+Each agent gets its own identity, persistent memory, session resumption, and startup/shutdown protocols — so it can run a real business autonomously and report back to its human backer (you).
 
 ![AgentCEO demo](demo.gif)
 
@@ -149,7 +149,8 @@ Each agent is scoped to its own directory and staging server. It will never read
 
 ### Human Escalation
 
-Agents only escalate to their backer when:
+Your **backer** is you — the human who owns and runs the agent. The agent works autonomously but escalates to you when:
+
 - A credential or API key is needed
 - About to spend money
 - Stuck after 2 attempts
@@ -203,8 +204,6 @@ This framework was built by running it. The agents below operate on this codebas
 | Agent | Company | Role |
 |-------|---------|------|
 | aria | Acme Store | E-commerce, product, marketing |
-| lexi | Example Agency | Consulting, web presence |
-| nova | Example SaaS | Email product |
 | sam | AgentCEO | This repo — framework maintenance |
 
 ---
