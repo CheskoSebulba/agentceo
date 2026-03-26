@@ -250,6 +250,14 @@ The script prompts before overwriting. Business data (`core.md`, logs, `.env`) i
 **`--resume` loads old context before startup message**
 This is expected. The prior session loads first, then the startup message fires. Wait for the startup routine to finish before typing.
 
+**Agent launches with wrong session / `unknown option` error**
+Cause: the command `ls -t ~/.claude/projects/ | head -1` captures the most recently active Claude project across *all* agents on the machine — not the current agent. If multiple agents run on the same machine, they overwrite each other's `last_session.txt`.
+```bash
+# Immediate fix — clear the bad session ID:
+echo "" > ~/agentname/memory/last_session.txt
+```
+Prevention: never use `ls -t ~/.claude/projects/` to capture session IDs. Session IDs must be written by the agent itself during its session.
+
 ---
 
 ## Known Issues
