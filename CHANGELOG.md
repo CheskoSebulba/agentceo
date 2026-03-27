@@ -1,5 +1,71 @@
 # Changelog
 
+## v1.8.0 — 2026-03-27
+
+### Added
+- **Starter kits** — three pre-configured business models replace `Mission: TBD`
+  - `kits/saas.md` — subscription product, MRR tracking, churn, revenue goal
+  - `kits/content.md` — blog/newsletter, subscriber count, sponsorship/affiliate revenue
+  - `kits/ecommerce.md` — product sales, order tracking, AOV, refund rate
+- Kit selection menu in `create_agent.sh` (1=SaaS, 2=Content, 3=E-commerce, 4=Custom)
+- Kit populates `core.md` with business-model-specific memory structure
+- Kit injects first task into onboarding prompt so agent starts working immediately
+- Custom path preserves all existing behaviour — no breaking change
+
+### Fixed
+- `SCRIPT_DIR` moved to top of `create_agent.sh` — kit paths now resolve correctly during prompts
+
+### Tests
+- T17–T20 added: kit selection, core.md population, custom fallback (44/44 passing)
+
+---
+
+## v1.7.2 — 2026-03-26
+
+### Fixed
+- **Critical:** removed `ls -t ~/.claude/projects/ | head -1` session ID capture from all templates
+  - This command captures the most recently active Claude project across ALL agents on the machine
+  - On multi-agent machines it caused agents to overwrite each other's `last_session.txt`, leading to launch failures and wrong-session resumes
+  - Session IDs must be written by the agent itself during its session
+- README troubleshooting section updated with symptom, cause, immediate fix, and prevention
+
+---
+
+## v1.7.1 — 2026-03-25
+
+### Fixed
+- `upgrade_agent.sh`, `create_agent.sh`: portable `stat` for `.env` permission checks (Linux + macOS)
+- `upgrade_agent.sh`: portable `sed -i` via `sedi()` helper (macOS requires empty backup suffix)
+- `upgrade_agent.sh`: sed delimiter conflict — `|` in launcher path fix clashed with `||` in replacement string; changed to `#`
+- `list_agents.sh`: `ping -W` not supported on macOS/BSD — now tries `curl` first, then `-W2` (Linux), then `-t2` (macOS)
+- `telegram_notify.sh`: removed undeclared `python3` dependency — Telegram response now parsed with `grep`/`sed`
+- `install.sh`: guard against empty `SHELL_RC` producing broken `source` instruction
+- `weekly_summary.sh`: guard against empty `logs/` directory causing glob expansion crash
+- `agent_onboarding_template.md`: `USER@` placeholder corrected to `[SSH_USER]@`
+
+---
+
+## v1.7.0 — 2026-03-25
+
+### Added
+- `list_agents.sh` — lists all AgentCEO agents on the machine
+  - Shows company, status, revenue, last active date, current task
+  - Server reachability check (ping/curl)
+  - `--upgrade-check` flag compares launcher version vs current
+- `telegram_notify.sh` — Telegram Bot API wrapper for backer notifications
+  - `--morning`: structured morning report from `core.md` + `shutdown_state.md`
+  - `--evening`: evening summary from today's log
+  - Self-configures `AGENT_DIR` from script location
+  - Prints setup instructions if `TELEGRAM_BOT_TOKEN`/`TELEGRAM_CHAT_ID` missing
+  - Copied into each new agent's `scripts/` directory by `create_agent.sh`
+- `weekly_summary.sh` — 7-day activity digest
+  - Shows days active, task count, per-day breakdown
+  - `--telegram` sends condensed version and saves full report
+  - `--output` writes to file
+- Post-install validation in `create_agent.sh` — 8 checks run automatically before first launch
+
+---
+
 ## v1.6.0 — 2026-03-25
 
 ### Security
