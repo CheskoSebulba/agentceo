@@ -2,7 +2,7 @@
 
 > An AI that runs your business while you sleep.
 
-Give it a name, a mission, and a server. It ships products, manages deployments, writes code, and sends you a morning report. You step in when it needs money, credentials, or a strategic call — everything else it handles on its own.
+Give it a name, a business type, and optionally a server. It ships products, manages deployments, writes code, and sends you a morning report. You step in when it needs money, credentials, or a strategic call — everything else it handles on its own.
 
 Built on [Claude Code](https://claude.ai/code). Pure bash. No dependencies.
 
@@ -17,7 +17,7 @@ Built on [Claude Code](https://claude.ai/code). Pure bash. No dependencies.
 - Linux or macOS
 - Claude Code ≥ 1.0 — [install guide](https://claude.ai/code)
 
-**New to Claude Code?** Three commands:
+**New to Claude Code?** Two commands:
 ```bash
 npm install -g @anthropic-ai/claude-code
 claude   # follow the auth prompts
@@ -59,7 +59,7 @@ One command creates a fully configured autonomous agent:
 Agent name (lowercase, no spaces) e.g. walter: aria
 Display name e.g. Walter: Aria
 Company name e.g. Acme Corp: Acme Store
-Mission (Enter for TBD): Build and sell digital products
+Starter kit (1=SaaS, 2=Content, 3=E-commerce, 4=Custom): 1
 Staging server hostname e.g. aria.local (Enter to skip): aria.local
 Staging server SSH username: deploy
 Launch emoji (Enter for 🤖): 🦾
@@ -73,7 +73,7 @@ It creates:
 ├── .env                             # Credentials (chmod 600, never committed)
 ├── start_aria.sh                    # Launcher with session resume
 ├── memory/
-│   ├── core.md                      # Business state
+│   ├── core.md                      # Business state (pre-filled by starter kit)
 │   ├── shutdown_state.md            # Live task tracker
 │   ├── crash_recovery.md            # Recovery playbook
 │   ├── pending_backer_actions.md    # Items waiting for your input
@@ -81,11 +81,60 @@ It creates:
 ├── logs/
 │   └── YYYY-MM-DD.md                # Daily activity log
 ├── scripts/
+│   └── telegram_notify.sh           # Backer notifications (optional)
 ├── skills/
 └── templates/
 ```
 
 And adds a shell alias so `aria` launches the agent instantly.
+
+---
+
+## Starter Kits
+
+Pick a business model during setup and get a fully populated `core.md` — with revenue tracking fields, a current sprint, and a concrete first task — instead of starting with `Mission: TBD`.
+
+| Kit | Mission | Memory includes |
+|-----|---------|----------------|
+| **SaaS** | Subscription product, MRR tracking | MRR, paying customers, churn, revenue goal |
+| **Content** | Blog/newsletter, sponsorship revenue | Subscriber count, sponsor/affiliate/product revenue |
+| **E-commerce** | Product sales, order handling | Orders, AOV, refunds, revenue goal |
+| **Custom** | Enter your own mission | Standard memory structure |
+
+Each kit also sets the agent's first task — a specific research or planning exercise to do before building anything — so it starts working immediately.
+
+---
+
+## Included Tools
+
+| File | Purpose |
+|------|---------|
+| `create_agent.sh` | Creates a new agent — run once per agent |
+| `upgrade_agent.sh` | Upgrades existing agents to the current framework version |
+| `list_agents.sh` | Lists all AgentCEO agents on the machine with status |
+| `telegram_notify.sh` | Sends morning reports and alerts to your phone via Telegram |
+| `weekly_summary.sh` | Compiles a 7-day digest of agent activity |
+| `start_agent_template.sh` | Reference launcher for custom configurations |
+| `agent_onboarding_template.md` | Full operating protocols — copied into each agent's memory |
+| `kits/` | Starter kit definitions for each business model |
+
+### Upgrading existing agents
+
+If you have agents created with an older version:
+
+```bash
+bash upgrade_agent.sh agentname
+```
+
+It detects what's outdated, shows a plan, creates a backup, and applies only the changes needed. It never touches `core.md`, logs, or `.env` contents.
+
+### Listing all agents
+
+```bash
+bash list_agents.sh
+```
+
+Shows every agent on the machine: company, status, last active date, current task, and whether the staging server is reachable.
 
 ---
 
@@ -150,7 +199,7 @@ On every launch, the launcher automatically sends `"[Agent], execute your startu
 
 > **Note:** When using `--resume`, the prior session context loads before the startup message fires. This is expected — wait for the startup routine to complete before typing anything.
 
-### Permissions model
+### Permissions Model
 
 Every agent launcher passes `--dangerously-skip-permissions` to Claude Code. This flag disables per-tool confirmation prompts so the agent can work autonomously without stopping to ask for approval on every file read or bash command. Without it, the agent would pause on every action and require human confirmation — defeating the purpose.
 
@@ -180,15 +229,15 @@ Your **backer** is you — the human who owns and runs the agent. The agent work
 
 Everything else it handles on its own.
 
----
+### Telegram Notifications (optional)
 
-## Included Files
+Each agent ships with `telegram_notify.sh`. Point it at a Telegram bot and the agent sends:
 
-| File | Purpose |
-|------|---------|
-| `create_agent.sh` | Main creator — run once per agent |
-| `start_agent_template.sh` | Reference launcher template for custom launchers |
-| `agent_onboarding_template.md` | Full operating protocols — copied into each agent's memory |
+- Morning report on startup — status, priorities, blockers
+- Evening summary on shutdown — what was done, what's next
+- Alerts when something needs your attention
+
+Setup: create a bot via [@BotFather](https://t.me/BotFather), add `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` to `.env`.
 
 ---
 
@@ -251,7 +300,7 @@ The script prompts before overwriting. Business data (`core.md`, logs, `.env`) i
 This is expected. The prior session loads first, then the startup message fires. Wait for the startup routine to finish before typing.
 
 **Agent launches with wrong session / `unknown option` error**
-Cause: the command `ls -t ~/.claude/projects/ | head -1` captures the most recently active Claude project across *all* agents on the machine — not the current agent. If multiple agents run on the same machine, they overwrite each other's `last_session.txt`.
+Cause: the command `ls -t ~/.claude/projects/ | head -1` captures the most recently active Claude project across *all* agents on the machine — not the current agent. On multi-agent machines this causes session ID collisions.
 ```bash
 # Immediate fix — clear the bad session ID:
 echo "" > ~/agentname/memory/last_session.txt
@@ -262,9 +311,8 @@ Prevention: never use `ls -t ~/.claude/projects/` to capture session IDs. Sessio
 
 ## Known Issues
 
-- **macOS `stat` command** — `upgrade_agent.sh` and `run_tests.sh` use Linux `stat` syntax on some code paths. Fixed in v1.6.0.
-- **Agent name collision** — creating two agents with the same name overwrites the first. The script now prompts before overwriting.
 - **Session ID not written by launcher** — the session ID is written by the agent itself during its session, not by the launcher on exit. If a session crashes before the agent writes it, `--resume` silently falls back to `--continue`.
+- **Agent name collision** — creating two agents with the same name overwrites the first. The script prompts before overwriting.
 
 ---
 
@@ -272,8 +320,7 @@ Prevention: never use `ls -t ~/.claude/projects/` to capture session IDs. Sessio
 
 | Agent | Company | Role |
 |-------|---------|------|
-| aria | Acme Store | E-commerce, product, marketing |
-| sam | AgentCEO | This repo — framework maintenance |
+| sam | AgentCEO | Framework maintenance, this repo |
 
 If you've built an agent with this framework, open a PR to add it.
 
