@@ -121,6 +121,21 @@ if [[ -f "$LAUNCHER" ]] && grep -q '| tee' "$LAUNCHER" 2>/dev/null; then
     upgrade_descriptions+=("start_${AGENT_NAME}.sh: remove tee pipe — breaks interactive Claude Code sessions")
 fi
 
+if [[ -f "$LAUNCHER" ]] && grep -q '\-\-continue' "$LAUNCHER" 2>/dev/null; then
+    upgrade_items+=("launcher_continue_flag")
+    upgrade_descriptions+=("start_${AGENT_NAME}.sh: remove --continue from fresh path — fails on first-ever launch with no prior sessions")
+fi
+
+if [[ -f "$LAUNCHER" ]] && ! grep -q 'source.*\.env' "$LAUNCHER" 2>/dev/null; then
+    upgrade_items+=("launcher_env_missing")
+    upgrade_descriptions+=("start_${AGENT_NAME}.sh: add .env sourcing so credentials are available on launch")
+fi
+
+if [[ -f "$LAUNCHER" ]] && ! grep -q 'execute your startup routine' "$LAUNCHER" 2>/dev/null; then
+    upgrade_items+=("launcher_no_startup_msg")
+    upgrade_descriptions+=("start_${AGENT_NAME}.sh: add startup message so agent runs its routine automatically")
+fi
+
 if [[ -f "$ENV_FILE" ]]; then
     env_perms=$(stat_perms "$ENV_FILE")
     if [[ "$env_perms" != "600" ]]; then
@@ -328,10 +343,15 @@ if [[ " ${upgrade_items[*]} " == *" launcher_hardcoded_path "* ]]; then
     (( CHANGED++ ))
 fi
 
-# ── Launcher: remove tee pipe (breaks interactive TTY) ────────────────────────
-if [[ " ${upgrade_items[*]} " == *" launcher_tee_pipe "* ]]; then
+# ── Launcher: full rewrite when any launcher issue detected ───────────────────
+launcher_needs_rewrite=false
+for item in launcher_tee_pipe launcher_continue_flag launcher_env_missing launcher_no_startup_msg; do
+    [[ " ${upgrade_items[*]} " == *" $item "* ]] && launcher_needs_rewrite=true
+done
+
+if [[ "$launcher_needs_rewrite" == "true" ]]; then
     # Detect agent display name and emoji from existing launcher
-    local_emoji=$(grep -o '^echo ".*Launching' "$LAUNCHER" 2>/dev/null | grep -o '^echo "[^ ]*' | sed 's/echo "//' | head -1)
+    local_emoji=$(grep -o 'echo ".*Launching' "$LAUNCHER" 2>/dev/null | grep -o '"[^ ]*' | sed 's/"//' | head -1)
     [[ -z "$local_emoji" ]] && local_emoji="🤖"
     local_display=$(grep -o 'Launching .*\.\.\.' "$LAUNCHER" 2>/dev/null | sed 's/Launching //' | sed 's/\.\.\.//' | head -1)
     [[ -z "$local_display" ]] && local_display="$AGENT_NAME"
@@ -345,23 +365,36 @@ AGENT_DIR="$AGENT_DIR"
 RESUME_FILE="\$AGENT_DIR/memory/last_session.txt"
 CLAUDE_BIN=\$(which claude 2>/dev/null || echo "\$HOME/.npm-global/bin/claude")
 
+# Load agent credentials
+set -a
+source "\$AGENT_DIR/.env" 2>/dev/null
+set +a
+
 echo "$local_emoji Launching $local_display..."
 
 cd "\$AGENT_DIR"
 
 if [ -f "\$RESUME_FILE" ] && [ -s "\$RESUME_FILE" ]; then
     SESSION_ID=\$(cat "\$RESUME_FILE")
-    echo "📂 Resuming session: \$SESSION_ID"
-    exec \$CLAUDE_BIN \\
-        --resume "\$SESSION_ID" \\
-        --dangerously-skip-permissions
-else
-    echo "🆕 Starting fresh session..."
-    exec \$CLAUDE_BIN --dangerously-skip-permissions
+    if [[ "\$SESSION_ID" =~ ^[0-9a-f-]{36}$ ]]; then
+        echo "📂 Resuming session: \$SESSION_ID"
+        exec \$CLAUDE_BIN \\
+            --resume "\$SESSION_ID" \\
+            --dangerously-skip-permissions \\
+            "$local_display, execute your startup routine now."
+    else
+        echo "⚠️  Invalid session ID — starting fresh"
+        rm -f "\$RESUME_FILE"
+    fi
 fi
+
+echo "🆕 Starting fresh session..."
+exec \$CLAUDE_BIN \\
+    --dangerously-skip-permissions \\
+    "$local_display, execute your startup routine now."
 LAUNCHEOF
     chmod +x "$LAUNCHER"
-    changed "start_${AGENT_NAME}.sh — removed tee pipe, now launches interactively"
+    changed "start_${AGENT_NAME}.sh — updated to current launcher template (v$CURRENT_VERSION)"
     (( CHANGED++ ))
 fi
 

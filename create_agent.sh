@@ -3,14 +3,14 @@
 # ============================================================
 # AgentCEO — Autonomous AI CEO Creator
 # https://github.com/CheskoSebulba/agentceo
-# Version: 1.8.2
+# Version: 1.8.3
 # License: MIT
 # ============================================================
 
 # ============================================================
 # Configuration — set your GitHub username here
 # ============================================================
-VERSION="1.8.2"
+VERSION="1.8.3"
 AGENTCEO_GITHUB_USER="${AGENTCEO_GITHUB_USER:-CheskoSebulba}"
 AGENTCEO_REPO_URL="https://github.com/$AGENTCEO_GITHUB_USER/agentceo"
 
@@ -500,11 +500,15 @@ fi
 if [ "$SKIP_SSH" = false ]; then
     echo ""
     echo "🔑 Setting up SSH key for $AGENT_SERVER..."
-    ssh-keygen -t ed25519 \
-        -C "${AGENT_NAME}@${AGENT_SERVER}" \
-        -f "$HOME/.ssh/${AGENT_NAME}_staging" \
-        -N "" 2>/dev/null
-    echo "✅ SSH key generated"
+    if [ -f "$HOME/.ssh/${AGENT_NAME}_staging" ]; then
+        echo "✅ SSH key already exists — reusing $HOME/.ssh/${AGENT_NAME}_staging"
+    else
+        ssh-keygen -t ed25519 \
+            -C "${AGENT_NAME}@${AGENT_SERVER}" \
+            -f "$HOME/.ssh/${AGENT_NAME}_staging" \
+            -N "" 2>/dev/null
+        echo "✅ SSH key generated"
+    fi
 
     if [ -n "$AGENT_SERVER_PASS" ]; then
         SSHPASS="$AGENT_SERVER_PASS" sshpass -e ssh-copy-id \

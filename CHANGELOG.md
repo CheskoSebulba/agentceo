@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.8.3 — 2026-03-27
+
+### Fixed
+- **`upgrade_agent.sh` launcher rewrite was missing `.env` sourcing, startup message, and UUID validation** — agents upgraded from old versions got a launcher that launched silently with no startup routine and no credentials loaded; upgrader now rewrites to full current template when any launcher issue is detected
+- **`upgrade_agent.sh` didn't detect `--continue` flag or missing startup message** — added two new upgrade checks: `launcher_continue_flag` and `launcher_no_startup_msg`
+- **`ssh-keygen` hangs on re-run for same agent name** — if SSH key already exists, setup now reuses it instead of calling `ssh-keygen` interactively
+
+---
+
 ## v1.8.2 — 2026-03-27
 
 ### Fixed
