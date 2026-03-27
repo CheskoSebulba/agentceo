@@ -10,13 +10,16 @@
 # ============================================================
 # Configuration — set your GitHub username here
 # ============================================================
-VERSION="1.6.0"
+VERSION="1.8.0"
 AGENTCEO_GITHUB_USER="${AGENTCEO_GITHUB_USER:-CheskoSebulba}"
 AGENTCEO_REPO_URL="https://github.com/$AGENTCEO_GITHUB_USER/agentceo"
 
 # OS detection
 OS="linux"
 [[ "$(uname)" == "Darwin" ]] && OS="macos"
+
+# Script location (needed for kit and template paths)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Sanitize free-text input — strip shell-dangerous characters
 sanitize() {
@@ -62,9 +65,30 @@ while true; do
     echo "❌ Company name is required. Try again."
 done
 
-# Mission — optional
-read -p "Mission (Enter for TBD): " AGENT_MISSION_RAW
-AGENT_MISSION=$(sanitize "${AGENT_MISSION_RAW:-"TBD — awaiting backer briefing"}")
+# Starter kit — optional
+KIT_CHOICE=""
+KIT_FILE=""
+echo "Starter kit (sets mission, memory structure, and first task):"
+echo "  1) SaaS       — subscription product, MRR tracking"
+echo "  2) Content     — blog/newsletter, sponsorship revenue"
+echo "  3) E-commerce  — product sales, order handling"
+echo "  4) Custom      — enter your own mission"
+read -p "Choose 1-4 (Enter for Custom): " KIT_NUM
+case "$KIT_NUM" in
+    1) KIT_CHOICE="saas";      KIT_FILE="$SCRIPT_DIR/kits/saas.md" ;;
+    2) KIT_CHOICE="content";   KIT_FILE="$SCRIPT_DIR/kits/content.md" ;;
+    3) KIT_CHOICE="ecommerce"; KIT_FILE="$SCRIPT_DIR/kits/ecommerce.md" ;;
+    *) KIT_CHOICE="custom" ;;
+esac
+
+# Mission — pre-filled by kit or entered manually
+if [[ "$KIT_CHOICE" == "custom" ]] || [[ ! -f "$KIT_FILE" ]]; then
+    read -p "Mission (Enter for TBD): " AGENT_MISSION_RAW
+    AGENT_MISSION=$(sanitize "${AGENT_MISSION_RAW:-"TBD — awaiting backer briefing"}")
+else
+    AGENT_MISSION=$(grep "^## MISSION" -A 6 "$KIT_FILE" | grep -v "^##" | grep -v "^#" | head -4 | tr '\n' ' ' | sed 's/  */ /g' | xargs)
+    echo "✅ Mission set from $KIT_CHOICE kit"
+fi
 
 # Staging server — optional, warn if blank
 read -p "Staging server hostname e.g. walter.local (Enter to skip): " AGENT_SERVER
@@ -270,8 +294,25 @@ cat > "$AGENT_DIR/.claude/settings.json" << SETTINGSEOF
 SETTINGSEOF
 echo "✅ Claude Code settings configured"
 
-# Step 4 — core.md
-cat > "$AGENT_DIR/memory/core.md" << COREEOF
+# Step 4 — core.md (kit-aware)
+if [[ -n "$KIT_FILE" ]] && [[ -f "$KIT_FILE" ]]; then
+    # Extract CORE_MD_STUB from kit file and substitute placeholders
+    awk '/^## CORE_MD_STUB/{found=1; next} found && /^## END_STUB/{exit} found{print}' "$KIT_FILE" \
+        | sed "s/\[AGENT_NAME\]/$AGENT_DISPLAY/g" \
+        | sed "s/\[AGENT_COMPANY\]/$AGENT_COMPANY/g" \
+        | sed "s/\[TODAY\]/$TODAY/g" \
+        | sed "s/\[PRIMARY_SERVER\]/$AGENT_SERVER/g" \
+        > "$AGENT_DIR/memory/core.md"
+    # Append credentials and SSH key sections
+    cat >> "$AGENT_DIR/memory/core.md" << CREDEOF
+
+## Credentials
+- All stored in $AGENT_DIR/.env — never logged here
+- SSH key: $HOME/.ssh/${AGENT_NAME}_staging
+CREDEOF
+    echo "✅ core.md created from $KIT_CHOICE kit"
+else
+    cat > "$AGENT_DIR/memory/core.md" << COREEOF
 # ${AGENT_DISPLAY}'s Memory
 
 ## About Me
@@ -310,7 +351,8 @@ cat > "$AGENT_DIR/memory/core.md" << COREEOF
 - Await mission briefing from backer
 - Get SSH access to $AGENT_SERVER if not already done
 COREEOF
-echo "✅ core.md created"
+    echo "✅ core.md created"
+fi
 
 # Step 5 — shutdown_state.md
 cat > "$AGENT_DIR/memory/shutdown_state.md" << SHUTEOF
@@ -405,7 +447,6 @@ GITEOF
 echo "✅ .gitignore created"
 
 # Step 9 — Copy and substitute onboarding template
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ONBOARDING_TEMPLATE="$SCRIPT_DIR/agent_onboarding_template.md"
 if [ -f "$ONBOARDING_TEMPLATE" ]; then
     sed \
@@ -595,6 +636,10 @@ After reading everything:
 1. Confirm your identity and mission
 2. Save your session ID to $AGENT_DIR/memory/last_session.txt
 3. Tell me you are ready and what you need to get started
+$(if [[ -n "$KIT_FILE" ]] && [[ -f "$KIT_FILE" ]]; then
+    first_task=$(awk '/^## FIRST_TASK/{found=1; next} found && /^## /{exit} found{print}' "$KIT_FILE" | xargs)
+    [[ -n "$first_task" ]] && echo "" && echo "Your first task: $first_task"
+fi)
 PROMPTEOF
 echo "---END COPY---"
 echo ""
