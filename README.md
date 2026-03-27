@@ -31,9 +31,15 @@ cd agentceo
 bash create_agent.sh
 ```
 
-Follow the prompts. Takes about 2 minutes.
+Already have the repo? Update it first:
+```bash
+cd agentceo && git pull
+bash create_agent.sh
+```
 
-### Step 2 — Source your shell
+Follow the prompts. Takes about 2 minutes. At the end, select **y** to launch immediately.
+
+### Step 2 — Source your shell (if you skipped launch)
 
 ```bash
 source ~/.bashrc   # or ~/.zshrc if you use zsh
