@@ -10,7 +10,7 @@
 # ============================================================
 # Configuration — set your GitHub username here
 # ============================================================
-VERSION="1.8.0"
+VERSION="1.8.1"
 AGENTCEO_GITHUB_USER="${AGENTCEO_GITHUB_USER:-CheskoSebulba}"
 AGENTCEO_REPO_URL="https://github.com/$AGENTCEO_GITHUB_USER/agentceo"
 
@@ -536,18 +536,23 @@ cd "\$AGENT_DIR"
 
 if [ -f "\$RESUME_FILE" ] && [ -s "\$RESUME_FILE" ]; then
     SESSION_ID=\$(cat "\$RESUME_FILE")
-    echo "📂 Resuming session: \$SESSION_ID"
-    exec \$CLAUDE_BIN \
-        --resume "\$SESSION_ID" \
-        --dangerously-skip-permissions \
-        "$AGENT_DISPLAY, execute your startup routine now."
-else
-    echo "🆕 Starting fresh session..."
-    exec \$CLAUDE_BIN \
-        --continue \
-        --dangerously-skip-permissions \
-        "$AGENT_DISPLAY, execute your startup routine now."
+    # Validate UUID format before use
+    if [[ "\$SESSION_ID" =~ ^[0-9a-f-]{36}$ ]]; then
+        echo "📂 Resuming session: \$SESSION_ID"
+        exec \$CLAUDE_BIN \
+            --resume "\$SESSION_ID" \
+            --dangerously-skip-permissions \
+            "$AGENT_DISPLAY, execute your startup routine now."
+    else
+        echo "⚠️  Invalid session ID — starting fresh"
+        rm -f "\$RESUME_FILE"
+    fi
 fi
+
+echo "🆕 Starting fresh session..."
+exec \$CLAUDE_BIN \
+    --dangerously-skip-permissions \
+    "$AGENT_DISPLAY, execute your startup routine now."
 STARTEOF
 chmod +x "$AGENT_DIR/start_${AGENT_NAME}.sh"
 echo "✅ Startup script created with session capture"
@@ -646,6 +651,12 @@ echo ""
 echo "ℹ️  Note: The launcher ($AGENT_NAME) sends your startup message automatically."
 echo "   Only paste the above if launching Claude Code manually."
 echo ""
+
+# Offer immediate launch — bypasses needing to source the shell
+read -p "Launch $AGENT_DISPLAY now? (y/n): " LAUNCH_NOW
+if [[ "$LAUNCH_NOW" =~ ^[Yy]$ ]]; then
+    exec bash "$AGENT_DIR/start_${AGENT_NAME}.sh"
+fi
 
 # Clear the interrupt trap — setup completed successfully
 trap - INT TERM

@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.8.1 — 2026-03-27
+
+### Fixed
+- **First launch crash**: removed `--continue` from fresh session path in generated launcher and `start_agent_template.sh` — `--continue` requires a prior conversation to exist and errors with `Input must be provided through stdin or as a prompt argument when using --print` on machines with no prior Claude Code sessions
+- **Manual source required**: `create_agent.sh` now offers to launch the agent immediately after setup (`Launch [Name] now? (y/n)`), bypassing the need to `source ~/.bashrc` before first use
+
+---
+
 ## v1.8.0 — 2026-03-27
 
 ### Added

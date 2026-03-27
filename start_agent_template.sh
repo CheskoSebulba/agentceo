@@ -33,6 +33,5 @@ fi
 
 echo "🆕 Starting fresh session..."
 exec $CLAUDE_BIN \
-    --continue \
     --dangerously-skip-permissions \
     "[AGENT_DISPLAY], execute your startup routine now."
