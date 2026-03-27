@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.8.2 — 2026-03-27
+
+### Fixed
+- **`telegram_notify.sh` never copied**: path was `$SCRIPT_DIR/../telegram_notify.sh` (goes up from repo root — file doesn't exist there); corrected to `$SCRIPT_DIR/telegram_notify.sh` — every new agent now gets `scripts/telegram_notify.sh`
+- **Interrupt trap destroys existing agent on overwrite**: `rm -rf "$AGENT_DIR"` on INT/TERM would delete all data (logs, `.env`, `core.md`) if setup was interrupted during an overwrite; trap now only cleans up on fresh installs
+- **Confirm block shows full mission text for kit users**: now shows `Kit: saas/content/ecommerce`; long mission paragraph only shown for custom agents
+- **Stale version comment**: header comment updated from `1.6.0` to current version
+
+---
+
 ## v1.8.1 — 2026-03-27
 
 ### Fixed

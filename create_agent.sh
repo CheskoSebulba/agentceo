@@ -3,14 +3,14 @@
 # ============================================================
 # AgentCEO — Autonomous AI CEO Creator
 # https://github.com/CheskoSebulba/agentceo
-# Version: 1.6.0
+# Version: 1.8.2
 # License: MIT
 # ============================================================
 
 # ============================================================
 # Configuration — set your GitHub username here
 # ============================================================
-VERSION="1.8.1"
+VERSION="1.8.2"
 AGENTCEO_GITHUB_USER="${AGENTCEO_GITHUB_USER:-CheskoSebulba}"
 AGENTCEO_REPO_URL="https://github.com/$AGENTCEO_GITHUB_USER/agentceo"
 
@@ -119,7 +119,11 @@ echo ""
 echo "Creating agent with these settings:"
 echo "  Name:     $AGENT_DISPLAY"
 echo "  Company:  $AGENT_COMPANY"
-echo "  Mission:  $AGENT_MISSION"
+if [[ "$KIT_CHOICE" != "custom" ]]; then
+    echo "  Kit:      $KIT_CHOICE"
+else
+    echo "  Mission:  $AGENT_MISSION"
+fi
 echo "  Server:   $AGENT_SERVER"
 echo "  Emoji:    $AGENT_EMOJI"
 echo ""
@@ -156,8 +160,10 @@ fi
 # Secure file creation — restrict permissions to owner only
 umask 0077
 
-# Cleanup on interruption
-trap 'echo ""; echo "⚠️  Setup interrupted — cleaning up..."; rm -rf "$AGENT_DIR" 2>/dev/null; exit 1' INT TERM
+# Cleanup on interruption — only remove directory if this was a fresh install
+FRESH_INSTALL=true
+[ -d "$AGENT_DIR" ] && FRESH_INSTALL=false
+trap '[[ "$FRESH_INSTALL" == "true" ]] && { echo ""; echo "⚠️  Setup interrupted — cleaning up..."; rm -rf "$AGENT_DIR" 2>/dev/null; }; exit 1' INT TERM
 
 echo ""
 echo "$AGENT_EMOJI Setting up $AGENT_DISPLAY..."
@@ -574,7 +580,7 @@ else
 fi
 
 # Step 13b — Copy telegram_notify.sh to agent scripts/
-TELEGRAM_SCRIPT="$SCRIPT_DIR/../telegram_notify.sh"
+TELEGRAM_SCRIPT="$SCRIPT_DIR/telegram_notify.sh"
 if [ -f "$TELEGRAM_SCRIPT" ]; then
     cp "$TELEGRAM_SCRIPT" "$AGENT_DIR/scripts/telegram_notify.sh"
     chmod +x "$AGENT_DIR/scripts/telegram_notify.sh"
